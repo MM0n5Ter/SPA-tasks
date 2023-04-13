@@ -52,36 +52,43 @@ public class LiveVariableAnalysis extends
 
     @Override
     public SetFact<Var> newBoundaryFact(CFG<Stmt> cfg) {
-        // TODO - finish me
+        // TODO - finished
         return new SetFact<>();
-        // return null;
     }
 
     @Override
     public SetFact<Var> newInitialFact() {
-        // TODO - finish me
+        // TODO - finished
         return new SetFact<>();
-        // return null;
     }
 
     @Override
     public void meetInto(SetFact<Var> fact, SetFact<Var> target) {
-        // TODO - finish me
+        // TODO - finished
         target.union(fact);
     }
 
     @Override
     public boolean transferNode(Stmt stmt, SetFact<Var> in, SetFact<Var> out) {
-        // TODO - finish me
-        SetFact<Var> temOut = out.copy();
-        Optional<LValue> lValue = stmt.getDef();
-        List<RValue> rValues = stmt.getUses();
-        if((lValue.isPresent()) && (lValue.get() instanceof Var))
-            temOut.remove((Var) lValue.get());
-        for(RValue rValue : rValues){
-            if(rValue instanceof Var)
-                temOut.add((Var) rValue);
+        // TODO - finished
+        Optional<LValue> def = stmt.getDef();
+        List<RValue> uses = stmt.getUses();
+        SetFact<Var> newIn = new SetFact<Var>();
+        newIn.set(out);
+
+        if(def.isPresent() && (def.get() instanceof Var)) {
+            newIn.remove((Var) def.get());
         }
-        return in.union(temOut);
+        for(RValue i:uses) {
+            if(i instanceof Var) {
+                newIn.add((Var) i);
+            }
+        }
+
+        if(in.equals(newIn)) return false;
+        else {
+            in.set(newIn);
+            return true;
+        }
     }
 }
