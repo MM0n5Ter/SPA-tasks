@@ -73,15 +73,17 @@ public class LiveVariableAnalysis extends
         // TODO - finished
         Optional<LValue> def = stmt.getDef();
         List<RValue> uses = stmt.getUses();
-        SetFact<Var> newIn = new SetFact<Var>();
-        newIn.set(out);
+        SetFact<Var> newIn = out.copy();
 
-        if(def.isPresent() && (def.get() instanceof Var)) {
-            newIn.remove((Var) def.get());
+        if(def.isPresent()) {
+            LValue lValue = def.get();
+            if(lValue instanceof Var var){
+                newIn.remove(var);
+            }
         }
         for(RValue i:uses) {
-            if(i instanceof Var) {
-                newIn.add((Var) i);
+            if(i instanceof Var var) {
+                newIn.add(var);
             }
         }
 

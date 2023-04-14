@@ -42,13 +42,14 @@ class IterativeSolver<Node, Fact> extends Solver<Node, Fact> {
         // TODO - finish me
         boolean flag = true;
         while(flag) {
+            flag = false;
             for (Node node:cfg) {
                 if(cfg.isExit(node)) {continue;}
-                Fact outFacts = result.getOutFact(node);
                 for(Node succ:cfg.getSuccsOf(node)) {
-                    analysis.meetInto(result.getInFact(succ), outFacts);
+                    analysis.meetInto(result.getInFact(succ), result.getOutFact(node));
                 }
-                flag = analysis.transferNode(node, result.getInFact(node), outFacts);
+                flag |= analysis.transferNode(node, result.getInFact(node), result.getOutFact(node));
+
             }
         }
     }
