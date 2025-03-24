@@ -33,21 +33,14 @@ import pascal.taie.analysis.graph.cfg.CFGBuilder;
 import pascal.taie.analysis.graph.cfg.Edge;
 import pascal.taie.config.AnalysisConfig;
 import pascal.taie.ir.IR;
-import pascal.taie.ir.exp.ArithmeticExp;
-import pascal.taie.ir.exp.ArrayAccess;
-import pascal.taie.ir.exp.CastExp;
-import pascal.taie.ir.exp.FieldAccess;
-import pascal.taie.ir.exp.NewExp;
-import pascal.taie.ir.exp.RValue;
-import pascal.taie.ir.exp.Var;
+import pascal.taie.ir.exp.*;
 import pascal.taie.ir.stmt.AssignStmt;
 import pascal.taie.ir.stmt.If;
 import pascal.taie.ir.stmt.Stmt;
 import pascal.taie.ir.stmt.SwitchStmt;
+import pascal.taie.util.collection.Pair;
 
-import java.util.Comparator;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 public class DeadCodeDetection extends MethodAnalysis {
 
@@ -69,8 +62,78 @@ public class DeadCodeDetection extends MethodAnalysis {
                 ir.getResult(LiveVariableAnalysis.ID);
         // keep statements (dead code) sorted in the resulting set
         Set<Stmt> deadCode = new TreeSet<>(Comparator.comparing(Stmt::getIndex));
-        // TODO - finish me
+        // TODO - finished
         // Your task is to recognize dead code in ir and add it to deadCode
+
+        LinkedList<Stmt> stmts = new LinkedList<>();
+        Set<Stmt> reachableStmts = new HashSet<>();
+        Set<Stmt> visitedStmts = new HashSet<>();
+        stmts.add(cfg.getEntry());
+
+        reachableStmts.add(cfg.getEntry());
+        reachableStmts.add(cfg.getExit());
+
+        while (!stmts.isEmpty()) {
+            Stmt stmt = stmts.pop();
+            if (!visitedStmts.contains(stmt)) {
+                visitedStmts.add(stmt);
+                if (stmt instanceof AssignStmt assignStmt) {
+                    for (Edge<Stmt> edge : cfg.getOutEdgesOf(stmt)) {
+                        stmts.add(edge.getTarget());
+                    }
+
+                    if (!(assignStmt.getLValue() instanceof Var var && !liveVars.getResult(assignStmt).contains(var) && hasNoSideEffect(assignStmt.getRValue())))
+                        reachableStmts.add(stmt);
+
+                } else if (stmt instanceof If ifStmt) {
+                    reachableStmts.add(stmt);
+                    ConditionExp conditionStmt = ifStmt.getCondition();
+                    Value eval = ConstantPropagation.evaluate(conditionStmt, constants.getResult(ifStmt));
+                    if (eval.isConstant()) {
+                        Edge.Kind targetKind = eval.getConstant() == 1 ? Edge.Kind.IF_TRUE : Edge.Kind.IF_FALSE;
+                        for (Edge<Stmt> edge : cfg.getOutEdgesOf(stmt)) {
+                            if (edge.getKind() == targetKind)
+                                stmts.add(edge.getTarget());
+                        }
+                    } else {
+                        for (Edge<Stmt> edge : cfg.getOutEdgesOf(stmt)) {
+                            stmts.add(edge.getTarget());
+                        }
+                    }
+                } else if (stmt instanceof SwitchStmt switchStmt) {
+                    reachableStmts.add(stmt);
+                    Value eval = ConstantPropagation.evaluate(switchStmt.getVar(), constants.getResult(switchStmt));
+                    if (eval.isConstant()) {
+                        boolean matched = false;
+                        for (Edge<Stmt> edge : cfg.getOutEdgesOf(switchStmt)) {
+                            if (edge.getKind() == Edge.Kind.SWITCH_CASE && edge.getCaseValue() == eval.getConstant()) {
+                                matched = true;
+                                stmts.add(edge.getTarget());
+                            }
+                        }
+                        if (!matched) {
+                            Stmt defaultStmt = switchStmt.getDefaultTarget();
+                            stmts.add(defaultStmt);
+                        }
+                    } else {
+                        for (Edge<Stmt> edge : cfg.getOutEdgesOf(stmt)) {
+                            stmts.add(edge.getTarget());
+                        }
+                    }
+                } else {
+                    reachableStmts.add(stmt);
+                    for (Edge<Stmt> edge : cfg.getOutEdgesOf(stmt)) {
+                        stmts.add(edge.getTarget());
+                    }
+                }
+            }
+        }
+
+        for (Stmt stmt : cfg.getNodes()) {
+            if (!reachableStmts.contains(stmt)) {
+                deadCode.add(stmt);
+            }
+        }
         return deadCode;
     }
 
